@@ -12011,6 +12011,7 @@ var PIXI = (function (exports) {
 	        }
 	        var eventLen = events.length;
 
+			// console.info('pixi-event-on-down', {eventLen})
 	        for (var i = 0; i < eventLen; i++)
 	        {
 	            var event = events[i];
@@ -12020,10 +12021,15 @@ var PIXI = (function (exports) {
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
+				interactionEvent.data.identifier = event.identifier;
+				// interactionEvent.data.pointerId = event.identifier;
+				//在此处监控得到的event的identifier，看是否一致
+				// console.info('pixi-event-on-down',  interactionEvent.data.identifier)
 
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerDown, true);
 
 	            this.emit('pointerdown', interactionEvent);
+				// console.info('pixi-event-emit-down', interactionEvent)
 	            if (event.pointerType === 'touch')
 	            {
 	                this.emit('touchstart', interactionEvent);
@@ -12051,12 +12057,15 @@ var PIXI = (function (exports) {
 	        var data = interactionEvent.data;
 	        var id = interactionEvent.data.identifier;
 
+			// console.info('pixi-event-process-down', id)
 	        if (hit)
 	        {
 	            if (!displayObject.trackedPointers[id])
 	            {
 	                displayObject.trackedPointers[id] = new InteractionTrackingData(id);
 	            }
+				//此处是关键，传递给了viewport
+				// console.info('pixi-event-process-dispatch-down', interactionEvent, interactionEvent.data.pointerId);
 	            this.dispatchEvent(displayObject, 'pointerdown', interactionEvent);
 
 	            if (data.pointerType === 'touch')
@@ -12107,6 +12116,8 @@ var PIXI = (function (exports) {
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
+				interactionEvent.data.identifier = event.identifier;
+				// interactionEvent.data.pointerId = event.identifier;
 
 	            // perform hit testing for events targeting our canvas or cancel events
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, func, cancelled || !eventAppend);
@@ -12301,15 +12312,21 @@ var PIXI = (function (exports) {
 	        for (var i = 0; i < eventLen; i++)
 	        {
 	            var event = events[i];
+				// console.info('pixi-move-evt', i , event)
 
 	            var interactionData = this.getInteractionDataForPointerId(event);
 
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
+				interactionEvent.data.identifier = event.identifier;
+				// interactionEvent.data.pointerId = event.identifier;
 
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerMove, true);
-
+				
+				//此处为测试的关键性信息，由此得出了两个pointerId前后不一致的情况
+				//通过手动设置interactionEvent.data.identifier = event.identifier;解决
+				// console.info('pixi-move-dispatch-id['+ i +']',event.identifier, interactionEvent.data.pointerId);
 	            this.emit('pointermove', interactionEvent);
 	            if (event.pointerType === 'touch') { this.emit('touchmove', interactionEvent); }
 	            if (event.pointerType === 'mouse' || event.pointerType === 'pen') { this.emit('mousemove', interactionEvent); }
@@ -12379,6 +12396,7 @@ var PIXI = (function (exports) {
 	        var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	        interactionEvent.data.originalEvent = event;
+			interactionEvent.data.identifier = event.identifier;
 
 	        this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerOverOut, false);
 
@@ -12474,6 +12492,8 @@ var PIXI = (function (exports) {
 	        var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	        interactionEvent.data.originalEvent = event;
+			interactionEvent.data.identifier = event.identifier;
+			// interactionEvent.data.pointerId = event.identifier;
 
 	        if (event.pointerType === 'mouse')
 	        {
@@ -12496,7 +12516,7 @@ var PIXI = (function (exports) {
 	     */
 	    InteractionManager.prototype.getInteractionDataForPointerId = function getInteractionDataForPointerId (event)
 	    {
-	        var pointerId = event.pointerId;
+	        var pointerId = event.identifier || event.pointerId || 0;
 
 	        var interactionData;
 
@@ -28243,7 +28263,7 @@ var PIXI = (function (exports) {
 	    if (!window.Blob || typeof resource.data === 'string') {
 	      var type = resource.xhr.getResponseHeader('content-type'); // this is an image, convert the binary string into a data url
 
-	      if (type && type.indexOf('image') === 0) {
+	      if (type && type.indexOf('image') === 0 && resource.xhr) {
 	        resource.data = new Image();
 	        resource.data.src = "data:" + type + ";base64," + encodeBinary(resource.xhr.responseText);
 	        resource.type = Resource$1.TYPE.IMAGE; // wait until the image loads and then callback

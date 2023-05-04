@@ -29,6 +29,7 @@
     "webpack-cli": "^3.3.6"
   },
   "dependencies": {
-    "abab": "^2.0.3"
+    "abab": "^2.0.3",
+    "string-replace-webpack-plugin": "^0.1.3"
   }
 }

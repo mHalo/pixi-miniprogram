@@ -11,7 +11,7 @@ module.exports = {
   entry: path.join(__dirname, '../src/index'),
   target: 'web',
   output: {
-    path: path.join(__dirname, '../dist'),
+    path: path.join(__dirname, '../../../WebFront_Program/G-Shock.World.Webfront/wx-microapp/utils'),
     // path: path.join(__dirname, '../example/libs'),
     filename: 'pixi.miniprogram.js',
     libraryTarget: 'commonjs',
