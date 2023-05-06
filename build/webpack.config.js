@@ -2,8 +2,15 @@ const fs = require('fs')
 const path = require('path')
 const StringReplacePlugin = require("string-replace-webpack-plugin");
 
+const pixiVersion = 6;
+const pixiPath = 
+      pixiVersion == 5 ? './pixi/pixi@5.2.1.js' :
+      pixiVersion == 6 ? './pixi/pixi@6.5.9.js' :
+      './pixi/pixi@5.2.1.js';
+const ourputPixiFile = 'pixi.miniprogram.v'+ pixiVersion +'.js'
+
 function resolvePixiModule() {
-  const code = fs.readFileSync(path.resolve('./src/pixi.js'), 'utf8')
+  const code = fs.readFileSync(path.resolve(pixiPath), 'utf8')
   return code
 }
 
@@ -11,9 +18,9 @@ module.exports = {
   entry: path.join(__dirname, '../src/index'),
   target: 'web',
   output: {
-    path: path.join(__dirname, '../../../WebFront_Program/G-Shock.World.Webfront/wx-microapp/utils'),
+    path: path.join(__dirname, '../../../WebFront_Program/G-Shock.World.Webfront/gshock-world-wechat-app/utils'),
     // path: path.join(__dirname, '../example/libs'),
-    filename: 'pixi.miniprogram.js',
+    filename: ourputPixiFile,
     libraryTarget: 'commonjs',
   },
   module: {

@@ -32,6 +32,7 @@ var PIXI = (function (exports) {
 	//
 	// Check for native Promise and it has correct interface
 	//
+
 	var NativePromise = global['Promise'];
 	var nativePromiseSupported =
 	  NativePromise &&
@@ -825,7 +826,7 @@ var PIXI = (function (exports) {
 	     * @type {PIXI.MIPMAP_MODES}
 	     * @default PIXI.MIPMAP_MODES.POW2
 	     */
-	    MIPMAP_TEXTURES: 0,
+	    MIPMAP_TEXTURES: 1,
 
 	    /**
 	     * Default anisotropic filtering level of textures.
@@ -3975,7 +3976,34 @@ var PIXI = (function (exports) {
 	 * @return {boolean} Is WebGL supported.
 	 */
 	function isWebGLSupported() {
-	    supported=true;
+	    if (typeof supported === 'undefined') {
+	        supported = (function supported() {
+	            var contextOptions = {
+	                stencil: true,
+	                failIfMajorPerformanceCaveat: settings.FAIL_IF_MAJOR_PERFORMANCE_CAVEAT,
+	            };
+	            try {
+	                if (!window.WebGLRenderingContext) {
+	                    return false;
+	                }
+	                var canvas = document.createElement('canvas');
+	                var gl = (canvas.getContext('webgl', contextOptions)
+	                    || canvas.getContext('experimental-webgl', contextOptions));
+	                var success = !!(gl && gl.getContextAttributes().stencil);
+	                if (gl) {
+	                    var loseContext = gl.getExtension('WEBGL_lose_context');
+	                    if (loseContext) {
+	                        loseContext.loseContext();
+	                    }
+	                }
+	                gl = null;
+	                return success;
+	            }
+	            catch (e) {
+	                return false;
+	            }
+	        })();
+	    }
 	    return supported;
 	}
 
@@ -11921,6 +11949,7 @@ var PIXI = (function (exports) {
 	        {
 	            rect = this.interactionDOMElement.getBoundingClientRect();
 	        }
+
 	        var resolutionMultiplier = 1.0 / this.resolution;
 
 	        point.x = ((x - rect.left) * (this.interactionDOMElement.width / rect.width)) * resolutionMultiplier;
@@ -12009,9 +12038,9 @@ var PIXI = (function (exports) {
 	                originalEvent.preventDefault();
 	            }
 	        }
+
 	        var eventLen = events.length;
 
-			// console.info('pixi-event-on-down', {eventLen})
 	        for (var i = 0; i < eventLen; i++)
 	        {
 	            var event = events[i];
@@ -12021,15 +12050,10 @@ var PIXI = (function (exports) {
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
-				interactionEvent.data.identifier = event.identifier;
-				// interactionEvent.data.pointerId = event.identifier;
-				//在此处监控得到的event的identifier，看是否一致
-				// console.info('pixi-event-on-down',  interactionEvent.data.identifier)
 
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerDown, true);
 
 	            this.emit('pointerdown', interactionEvent);
-				// console.info('pixi-event-emit-down', interactionEvent)
 	            if (event.pointerType === 'touch')
 	            {
 	                this.emit('touchstart', interactionEvent);
@@ -12057,15 +12081,12 @@ var PIXI = (function (exports) {
 	        var data = interactionEvent.data;
 	        var id = interactionEvent.data.identifier;
 
-			// console.info('pixi-event-process-down', id)
 	        if (hit)
 	        {
 	            if (!displayObject.trackedPointers[id])
 	            {
 	                displayObject.trackedPointers[id] = new InteractionTrackingData(id);
 	            }
-				//此处是关键，传递给了viewport
-				// console.info('pixi-event-process-dispatch-down', interactionEvent, interactionEvent.data.pointerId);
 	            this.dispatchEvent(displayObject, 'pointerdown', interactionEvent);
 
 	            if (data.pointerType === 'touch')
@@ -12107,6 +12128,7 @@ var PIXI = (function (exports) {
 	        // if the event wasn't targeting our canvas, then consider it to be pointerupoutside
 	        // in all cases (unless it was a pointercancel)
 	        var eventAppend = originalEvent.target !== this.interactionDOMElement ? 'outside' : '';
+
 	        for (var i = 0; i < eventLen; i++)
 	        {
 	            var event = events[i];
@@ -12116,8 +12138,6 @@ var PIXI = (function (exports) {
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
-				interactionEvent.data.identifier = event.identifier;
-				// interactionEvent.data.pointerId = event.identifier;
 
 	            // perform hit testing for events targeting our canvas or cancel events
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, func, cancelled || !eventAppend);
@@ -12208,6 +12228,7 @@ var PIXI = (function (exports) {
 	        var trackingData = displayObject.trackedPointers[id];
 
 	        var isTouch = data.pointerType === 'touch';
+
 	        var isMouse = (data.pointerType === 'mouse' || data.pointerType === 'pen');
 	        // need to track mouse down status in the mouse block so that we can emit
 	        // event in a later block
@@ -12312,21 +12333,15 @@ var PIXI = (function (exports) {
 	        for (var i = 0; i < eventLen; i++)
 	        {
 	            var event = events[i];
-				// console.info('pixi-move-evt', i , event)
 
 	            var interactionData = this.getInteractionDataForPointerId(event);
 
 	            var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	            interactionEvent.data.originalEvent = originalEvent;
-				interactionEvent.data.identifier = event.identifier;
-				// interactionEvent.data.pointerId = event.identifier;
 
 	            this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerMove, true);
-				
-				//此处为测试的关键性信息，由此得出了两个pointerId前后不一致的情况
-				//通过手动设置interactionEvent.data.identifier = event.identifier;解决
-				// console.info('pixi-move-dispatch-id['+ i +']',event.identifier, interactionEvent.data.pointerId);
+
 	            this.emit('pointermove', interactionEvent);
 	            if (event.pointerType === 'touch') { this.emit('touchmove', interactionEvent); }
 	            if (event.pointerType === 'mouse' || event.pointerType === 'pen') { this.emit('mousemove', interactionEvent); }
@@ -12396,7 +12411,6 @@ var PIXI = (function (exports) {
 	        var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	        interactionEvent.data.originalEvent = event;
-			interactionEvent.data.identifier = event.identifier;
 
 	        this.processInteractive(interactionEvent, this.renderer._lastObjectRendered, this.processPointerOverOut, false);
 
@@ -12492,8 +12506,6 @@ var PIXI = (function (exports) {
 	        var interactionEvent = this.configureInteractionEventForDOMEvent(this.eventData, event, interactionData);
 
 	        interactionEvent.data.originalEvent = event;
-			interactionEvent.data.identifier = event.identifier;
-			// interactionEvent.data.pointerId = event.identifier;
 
 	        if (event.pointerType === 'mouse')
 	        {
@@ -12516,7 +12528,7 @@ var PIXI = (function (exports) {
 	     */
 	    InteractionManager.prototype.getInteractionDataForPointerId = function getInteractionDataForPointerId (event)
 	    {
-	        var pointerId = event.identifier || event.pointerId || 0;
+	        var pointerId = event.pointerId;
 
 	        var interactionData;
 
@@ -13192,7 +13204,7 @@ var PIXI = (function (exports) {
 	     */
 	    BaseImageResource.crossOrigin = function crossOrigin (element, url, crossorigin)
 	    {
-	        if (crossorigin === undefined && typeof url=="string"&&url.indexOf('data:') !== 0)
+	        if (crossorigin === undefined && url.indexOf('data:') !== 0)
 	        {
 	            element.crossOrigin = determineCrossOrigin(url);
 	        }
@@ -13220,44 +13232,19 @@ var PIXI = (function (exports) {
 
 	        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, baseTexture.alphaMode === exports.ALPHA_MODES.UNPACK);
 
-	        if (!this.noSubImage&& baseTexture.target === gl.TEXTURE_2D&& glTexture.width === width&& glTexture.height === height)
+	        if (!this.noSubImage
+	            && baseTexture.target === gl.TEXTURE_2D
+	            && glTexture.width === width
+	            && glTexture.height === height)
 	        {
-				if(source.type=='canvas') {
-					source = source.getContext('2d').getImageData(0, 0, source.width, source.height);
-					
-					gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, baseTexture.alphaMode === exports.ALPHA_MODES.UNPACK);
-					var buf = new Uint8Array(source.data);
-					gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, baseTexture.format, baseTexture.type, buf);
-				} else {
-					gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, baseTexture.format, baseTexture.type, source);
-				}
+	            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, baseTexture.format, baseTexture.type, source);
 	        }
 	        else
 	        {
 	            glTexture.width = width;
-				glTexture.height = height;
-				if(source.type=='canvas') {
-					source = source.getContext('2d').getImageData(0, 0, source.width, source.height);
-					
-					gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, baseTexture.alphaMode === exports.ALPHA_MODES.UNPACK);
-					var buf = new Uint8Array(source.data);
-					glTexture.width = baseTexture.width;
-					glTexture.height = baseTexture.height;
+	            glTexture.height = height;
 
-					gl.texImage2D(
-						baseTexture.target,
-						0,
-						glTexture.internalFormat,
-						baseTexture.width,
-						baseTexture.height,
-						0,
-						baseTexture.format,
-						glTexture.type,
-						buf
-					);
-				} else {
-					gl.texImage2D(baseTexture.target, 0, baseTexture.format, baseTexture.format, baseTexture.type, source);
-				}
+	            gl.texImage2D(baseTexture.target, 0, baseTexture.format, baseTexture.format, baseTexture.type, source);
 	        }
 
 	        return true;
@@ -13307,7 +13294,7 @@ var PIXI = (function (exports) {
 	    {
 	        options = options || {};
 
-	        if (typeof source=='string')
+	        if (!(source instanceof HTMLImageElement))
 	        {
 	            var imageElement = new Image();
 
@@ -13744,6 +13731,7 @@ var PIXI = (function (exports) {
 	        {
 	            glTexture.width = baseTexture.width;
 	            glTexture.height = baseTexture.height;
+
 	            gl.texImage2D(
 	                baseTexture.target,
 	                0,
@@ -14751,7 +14739,6 @@ var PIXI = (function (exports) {
 	var CanvasResource = /*@__PURE__*/(function (BaseImageResource) {
 	    function CanvasResource () {
 	        BaseImageResource.apply(this, arguments);
-			this.type='canvas';
 	    }
 
 	    if ( BaseImageResource ) { CanvasResource.__proto__ = BaseImageResource; }
@@ -14768,7 +14755,7 @@ var PIXI = (function (exports) {
 	            return true;
 	        }
 
-	        return source.type=="canvas";
+	        return source instanceof HTMLCanvasElement;
 	    };
 
 	    return CanvasResource;
@@ -16661,17 +16648,17 @@ var PIXI = (function (exports) {
 
 	function createWhiteTexture()
 	{
-	    var canvas = document.createElement('canvas2d');
+	    var canvas = document.createElement('canvas');
 
 	    canvas.width = 16;
 	    canvas.height = 16;
-		canvas.type='canvas';
 
 	    var context = canvas.getContext('2d');
 
 	    context.fillStyle = 'white';
 	    context.fillRect(0, 0, 16, 16);
-		return new Texture(new BaseTexture(new CanvasResource(canvas)));
+
+	    return new Texture(new BaseTexture(new CanvasResource(canvas)));
 	}
 
 	function removeAllHandlers(tex)
@@ -18630,7 +18617,7 @@ var PIXI = (function (exports) {
 	 * @default PIXI.ENV.WEBGL2
 	 */
 	settings.PREFER_ENV = isMobile$1.any ? exports.ENV.WEBGL : exports.ENV.WEBGL2;
-	settings.PREFER_ENV = exports.ENV.WEBGL;
+
 	/**
 	 * If set to `true`, Textures and BaseTexture objects stored
 	 * in the caches ({@link PIXI.utils.TextureCache TextureCache} and
@@ -18716,6 +18703,7 @@ var PIXI = (function (exports) {
 	        this.gl = gl;
 	        this.renderer.gl = gl;
 	        this.renderer.CONTEXT_UID = CONTEXT_UID++;
+
 	        // restore a context if it was previously lost
 	        if (gl.isContextLost() && gl.getExtension('WEBGL_lose_context'))
 	        {
@@ -18748,6 +18736,7 @@ var PIXI = (function (exports) {
 	    ContextSystem.prototype.initFromOptions = function initFromOptions (options)
 	    {
 	        var gl = this.createContext(this.renderer.view, options);
+
 	        this.initFromContext(gl);
 	    };
 
@@ -20316,8 +20305,6 @@ var PIXI = (function (exports) {
 
 	var unknownContext = {};
 	var context = unknownContext;
-	var testOptions = {};
-	var WebGLRenderingContext=null;
 
 	/**
 	 * returns a little WebGL context to use for program inspection.
@@ -20336,13 +20323,13 @@ var PIXI = (function (exports) {
 
 	        if (settings.PREFER_ENV >= exports.ENV.WEBGL2)
 	        {
-	            gl = canvas.getContext('webgl2', testOptions);
+	            gl = canvas.getContext('webgl2', {});
 	        }
 
 	        if (!gl)
-	        {	
-	            gl = canvas.getContext('webgl', testOptions)
-	            || canvas.getContext('experimental-webgl', testOptions);
+	        {
+	            gl = canvas.getContext('webgl', {})
+	            || canvas.getContext('experimental-webgl', {});
 
 	            if (!gl)
 	            {
@@ -20357,7 +20344,6 @@ var PIXI = (function (exports) {
 	        }
 
 	        context = gl;
-			WebGLRenderingContext=gl;
 	    }
 
 	    return context;
@@ -20367,22 +20353,23 @@ var PIXI = (function (exports) {
 
 	function getMaxFragmentPrecision()
 	{
-	    // if (!maxFragmentPrecision)
-	    // {
-	    //     maxFragmentPrecision = exports.PRECISION.MEDIUM;
-	    //     var gl = getTestContext();
+	    if (!maxFragmentPrecision)
+	    {
+	        maxFragmentPrecision = exports.PRECISION.MEDIUM;
+	        var gl = getTestContext();
 
-	    //     if (gl)
-	    //     {
-	    //         if (gl.getShaderPrecisionFormat)
-	    //         {
-	    //             var shaderFragment = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+	        if (gl)
+	        {
+	            if (gl.getShaderPrecisionFormat)
+	            {
+	                var shaderFragment = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 
-	    //             maxFragmentPrecision = shaderFragment.precision ? exports.PRECISION.HIGH : exports.PRECISION.MEDIUM;
-	    //         }
-	    //     }
-	    // }
-	    return 'highp';
+	                maxFragmentPrecision = shaderFragment.precision ? exports.PRECISION.HIGH : exports.PRECISION.MEDIUM;
+	            }
+	        }
+	    }
+
+	    return maxFragmentPrecision;
 	}
 
 	/**
@@ -24349,15 +24336,6 @@ var PIXI = (function (exports) {
 	        // the options will have been modified here in the super constructor with pixi's default settings..
 	        options = this.options;
 
-			testOptions={
-				alpha: this.transparent,
-				antialias: options.antialias,
-				premultipliedAlpha: this.transparent && this.transparent !== 'notMultiplied',
-				stencil: true,
-				preserveDrawingBuffer: options.preserveDrawingBuffer,
-				powerPreference: this.options.powerPreference||'high-performance',
-			};
-			getTestContext();
 	        /**
 	         * The type of this renderer as a standardized const
 	         *
@@ -24513,6 +24491,7 @@ var PIXI = (function (exports) {
 	            .addSystem(BatchSystem, 'batch');
 
 	        this.initPlugins(Renderer.__plugins);
+
 	        /**
 	         * The options passed in to create a new WebGL context.
 	         */
@@ -24528,7 +24507,7 @@ var PIXI = (function (exports) {
 	                premultipliedAlpha: this.transparent && this.transparent !== 'notMultiplied',
 	                stencil: true,
 	                preserveDrawingBuffer: options.preserveDrawingBuffer,
-	                powerPreference: this.options.powerPreference||'high-performance',
+	                powerPreference: this.options.powerPreference,
 	            });
 	        }
 
@@ -27585,6 +27564,7 @@ var PIXI = (function (exports) {
 	    if (this.crossOrigin) {
 	      this.data.crossOrigin = this.crossOrigin;
 	    }
+
 	    if (!this.metadata.skipSource) {
 	      // support for CocoonJS Canvas+ runtime, lacks document.createElement('source')
 	      if (navigator.isCocoonJS) {
@@ -28126,7 +28106,6 @@ var PIXI = (function (exports) {
 	  tga: Resource$1.XHR_RESPONSE_TYPE.BLOB,
 	  // json
 	  json: Resource$1.XHR_RESPONSE_TYPE.JSON,
-	  tjson: Resource$1.XHR_RESPONSE_TYPE.JSON,
 	  // text
 	  text: Resource$1.XHR_RESPONSE_TYPE.TEXT,
 	  txt: Resource$1.XHR_RESPONSE_TYPE.TEXT,
@@ -28263,7 +28242,7 @@ var PIXI = (function (exports) {
 	    if (!window.Blob || typeof resource.data === 'string') {
 	      var type = resource.xhr.getResponseHeader('content-type'); // this is an image, convert the binary string into a data url
 
-	      if (type && type.indexOf('image') === 0 && resource.xhr) {
+	      if (type && type.indexOf('image') === 0) {
 	        resource.data = new Image();
 	        resource.data.src = "data:" + type + ";base64," + encodeBinary(resource.xhr.responseText);
 	        resource.type = Resource$1.TYPE.IMAGE; // wait until the image loads and then callback
@@ -28290,6 +28269,8 @@ var PIXI = (function (exports) {
 	          resource.data.onload = null;
 	          next();
 	        }; // next will be called on load.
+
+
 	        return;
 	      }
 	  }
@@ -35681,9 +35662,7 @@ var PIXI = (function (exports) {
 	 */
 	TextMetrics.measureText = function measureText (text, style, wordWrap, canvas)
 	{
-		if(typeof canvas=="undefined") {
-			canvas = TextMetrics._canvas;
-		}
+	        if ( canvas === void 0 ) { canvas = TextMetrics._canvas; }
 
 	    wordWrap = (wordWrap === undefined || wordWrap === null) ? style.wordWrap : wordWrap;
 	    var font = style.toFontString();
@@ -36310,7 +36289,25 @@ var PIXI = (function (exports) {
 	 * @private
 	 */
 
-	var canvas = document.createElement("canvas2dText");
+	var canvas = (function () {
+	    try
+	    {
+	        // OffscreenCanvas2D measureText can be up to 40% faster.
+	        var c = new OffscreenCanvas(0, 0);
+	        var context = c.getContext('2d');
+
+	        if (context && context.measureText)
+	        {
+	            return c;
+	        }
+
+	        return document.createElement('canvas');
+	    }
+	    catch (ex)
+	    {
+	        return document.createElement('canvas');
+	    }
+	})();
 
 	canvas.width = canvas.height = 10;
 
@@ -36455,13 +36452,12 @@ var PIXI = (function (exports) {
 	var Text = /*@__PURE__*/(function (Sprite) {
 	    function Text(text, style, canvas)
 	    {
-	        canvas = canvas || document.createElement('canvas2dText');
+	        canvas = canvas || document.createElement('canvas');
 
 	        canvas.width = 3;
 	        canvas.height = 3;
 
-			var idata = canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height);
-	        var texture = Texture.fromBuffer(new Uint8Array(idata.data),canvas.width,canvas.height);
+	        var texture = Texture.from(canvas);
 
 	        texture.orig = new Rectangle();
 	        texture.trim = new Rectangle();
@@ -36554,10 +36550,10 @@ var PIXI = (function (exports) {
 	        {
 	            return;
 	        }
+
 	        this._font = this._style.toFontString();
 
-			var context = this.context;
-
+	        var context = this.context;
 	        var measured = TextMetrics.measureText(this._text || ' ', this._style, this._style.wordWrap, this.canvas);
 	        var width = measured.width;
 	        var height = measured.height;
@@ -36739,7 +36735,6 @@ var PIXI = (function (exports) {
 	     */
 	    Text.prototype.updateTexture = function updateTexture ()
 	    {
-			this.dirty=false;
 	        var canvas = this.canvas;
 
 	        if (this._style.trim)
@@ -36754,7 +36749,7 @@ var PIXI = (function (exports) {
 	            }
 	        }
 
-			var texture = this._texture;
+	        var texture = this._texture;
 	        var style = this._style;
 	        var padding = style.trim ? 0 : style.padding;
 	        var baseTexture = texture.baseTexture;
@@ -36762,10 +36757,7 @@ var PIXI = (function (exports) {
 	        texture.trim.width = texture._frame.width = Math.ceil(canvas.width / this._resolution);
 	        texture.trim.height = texture._frame.height = Math.ceil(canvas.height / this._resolution);
 	        texture.trim.x = -padding;
-			texture.trim.y = -padding;
-			texture.baseTexture.width = texture.trim.width;
-			texture.baseTexture.height = texture.trim.height;
-			texture.baseTexture.resource.data = new Uint8Array(this.context.getImageData(0,0,canvas.width,canvas.height).data);
+	        texture.trim.y = -padding;
 
 	        texture.orig.width = texture._frame.width - (padding * 2);
 	        texture.orig.height = texture._frame.height - (padding * 2);
@@ -38168,6 +38160,7 @@ var PIXI = (function (exports) {
 	SpritesheetLoader.use = function use (resource, next)
 	{
 	    var imageResourceName = (resource.name) + "_image";
+
 	    // skip if no data, its not json, it isn't spritesheet data, or the image resource already exists
 	    if (!resource.data
 	        || resource.type !== LoaderResource.TYPE.JSON
@@ -38187,6 +38180,7 @@ var PIXI = (function (exports) {
 	    };
 
 	    var resourcePath = SpritesheetLoader.getResourcePath(resource, this.baseUrl);
+
 	    // load the image for this sheet
 	    this.add(imageResourceName, resourcePath, loadOptions, function onImageLoad(res)
 	    {
@@ -44778,7 +44772,7 @@ var PIXI = (function (exports) {
 	}(Sprite));
 
 	// Install renderer plugins
-//	Renderer.registerPlugin('accessibility', AccessibilityManager);
+	Renderer.registerPlugin('accessibility', AccessibilityManager);
 	Renderer.registerPlugin('extract', Extract);
 	Renderer.registerPlugin('interaction', InteractionManager);
 	Renderer.registerPlugin('particle', ParticleRenderer);
