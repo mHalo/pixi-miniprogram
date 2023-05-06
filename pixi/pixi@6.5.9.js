@@ -1117,7 +1117,7 @@ var PIXI = (function (exports) {
     // function createMatch(userAgent) {
     //     return function (regex) { return regex.test(userAgent); };
     // }
-    console.info({globalThis})
+    // console.info({globalThis})
     function isMobile$1(param) {
         const systemInfo = wx.getSystemInfoSync();
         return {
